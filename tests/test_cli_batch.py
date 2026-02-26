@@ -48,6 +48,9 @@ def test_batch_conversion_and_force_skip_behavior(tmp_path: Path) -> None:
             split_pages=1,
             author_mode="auto",
             no_preface=False,
+            no_brand=False,
+            logo_path=None,
+            cover_mode="styled",
             force=False,
         )
         for path in [pdf_a, pdf_b, pdf_c]
@@ -74,6 +77,9 @@ def test_batch_conversion_and_force_skip_behavior(tmp_path: Path) -> None:
             split_pages=1,
             author_mode="auto",
             no_preface=False,
+            no_brand=False,
+            logo_path=None,
+            cover_mode="styled",
             force=True,
         )
     ]

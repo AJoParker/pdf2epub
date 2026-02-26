@@ -25,6 +25,7 @@ def build_epub(
     preface_authors: list[str] | None = None,
     preface_contacts: list[str] | None = None,
     include_preface: bool = True,
+    cover_png_bytes: bytes | None = None,
 ) -> None:
     """Build and write a simple reflowable EPUB from chapter text chunks."""
     book = epub.EpubBook()
@@ -32,6 +33,8 @@ def build_epub(
     book.set_title(title)
     book.set_language(lang)
     book.add_author(author)
+    if cover_png_bytes:
+        book.set_cover("cover.png", cover_png_bytes)
 
     items: list[epub.EpubHtml] = []
     if include_preface:
