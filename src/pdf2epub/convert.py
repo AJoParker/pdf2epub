@@ -8,9 +8,11 @@ from typing import Literal
 
 from .author_extract import infer_author_info
 from .epub_build import build_epub
+from .cover_gen import generate_cover_png
 from .pdf_extract import OCRMode, extract_pages_text
 
 AuthorMode = Literal["metadata", "heuristic", "auto"]
+CoverMode = Literal["styled", "none"]
 
 
 def _chunk_pages(pages: list[str], split_pages: int) -> list[str]:
@@ -35,6 +37,9 @@ def convert_pdf_to_epub(
     author_mode: AuthorMode = "auto",
     no_preface: bool = False,
     split_pages: int = 10,
+    no_brand: bool = False,
+    logo_path: Path | None = None,
+    cover_mode: CoverMode = "styled",
     logger: logging.Logger | None = None,
 ) -> None:
     """Convert a PDF file into a reflowable EPUB."""
@@ -60,6 +65,15 @@ def convert_pdf_to_epub(
         raise RuntimeError("No usable text extracted from PDF")
 
     logger.info("Building EPUB with %s chapter(s)", len(chapters))
+    cover_png_bytes = None
+    if cover_mode != "none":
+        cover_png_bytes = generate_cover_png(
+            title=title,
+            author=final_author,
+            include_branding=not no_brand,
+            logo_path=logo_path,
+        )
+
     build_epub(
         chapters,
         output_epub,
@@ -70,4 +84,5 @@ def convert_pdf_to_epub(
         preface_authors=preface_authors,
         preface_contacts=preface_contacts,
         include_preface=not no_preface,
+        cover_png_bytes=cover_png_bytes,
     )

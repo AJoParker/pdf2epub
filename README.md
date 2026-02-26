@@ -108,6 +108,9 @@ Options:
 - `--author-mode heuristic` -> use heuristic only
 - `--author-mode auto` -> metadata then heuristic fallback
 - `--no-preface` -> do not include the preface page
+- `--cover-mode styled|none` -> generate branded navy cover or disable cover generation
+- `--no-brand` -> keep styled cover but hide the logo badge
+- `--logo PATH` -> custom logo for bottom-right cover badge
 
 When preface is enabled, TOC/spine order starts with **Preface**, then Chapter 1, Chapter 2, etc.
 

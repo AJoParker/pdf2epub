@@ -12,7 +12,7 @@ from typing import Literal
 
 import typer
 
-from .convert import AuthorMode, convert_pdf_to_epub
+from .convert import AuthorMode, CoverMode, convert_pdf_to_epub
 from .pdf_extract import OCRMode
 
 try:
@@ -37,6 +37,9 @@ class ConvertTask:
     split_pages: int
     author_mode: AuthorMode
     no_preface: bool
+    no_brand: bool
+    logo_path: Path | None
+    cover_mode: CoverMode
     force: bool
 
 
@@ -130,6 +133,9 @@ def _convert_one(task: ConvertTask) -> ConvertResult:
             author_mode=task.author_mode,
             no_preface=task.no_preface,
             split_pages=task.split_pages,
+            no_brand=task.no_brand,
+            logo_path=task.logo_path,
+            cover_mode=task.cover_mode,
         )
     except Exception as exc:  # noqa: BLE001 - keep batch conversion alive per-file.
         return ConvertResult(status="fail", input_pdf=task.input_pdf, output_epub=task.output_epub, error=str(exc))
@@ -220,6 +226,9 @@ def main(
     author_mode: AuthorMode = typer.Option("auto", "--author-mode", help="Author inference mode: metadata, heuristic, auto."),
     no_preface: bool = typer.Option(False, "--no-preface", help="Do not include a preface section in the EPUB."),
     split_pages: int = typer.Option(10, "--split-pages", min=1, help="Pages per chapter."),
+    no_brand: bool = typer.Option(False, "--no-brand", help="Generate cover without embedding the logo badge."),
+    logo: Path | None = typer.Option(None, "--logo", exists=True, file_okay=True, dir_okay=False, help="Path to logo image used for cover branding."),
+    cover_mode: CoverMode = typer.Option("styled", "--cover-mode", help="Cover generation mode: styled or none."),
     force: bool = typer.Option(False, "--force", help="Overwrite existing EPUB output file(s)."),
     recursive: bool = typer.Option(False, "--recursive", help="Recursively scan directories for PDFs."),
     jobs: int = typer.Option(_default_jobs(), "-j", "--jobs", min=1, help="Parallel worker processes."),
@@ -250,6 +259,9 @@ def main(
             ocr_mode=ocr,
             author_mode=author_mode,
             no_preface=no_preface,
+            no_brand=no_brand,
+            logo_path=logo,
+            cover_mode=cover_mode,
             split_pages=split_pages,
             force=force,
         )
