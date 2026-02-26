@@ -8,6 +8,7 @@ A small, production-minded CLI tool to convert PDF files into reflowable EPUB fi
 - EPUB generation with [EbookLib](https://github.com/aerkalov/ebooklib)
 - Optional OCR fallback for scanned/image pages via `pytesseract`
 - Clean, simple chapter chunking by page count
+- Batch conversion from files, directories, and glob patterns
 
 ## Requirements
 
@@ -35,45 +36,81 @@ pip install -e '.[ocr]'
 ## Usage
 
 ```bash
-pdf2epub INPUT.pdf -o OUTPUT.epub
+pdf2epub FILES_OR_PATTERNS...
 ```
+
+### CLI behavior
+
+Input arguments can be:
+
+- PDF files
+- Directories (find `*.pdf` in that directory)
+- Glob patterns like `*.pdf`
+
+Examples:
+
+```bash
+# Single file
+pdf2epub input.pdf
+
+# Multiple files
+pdf2epub file1.pdf file2.pdf
+
+# Directory
+pdf2epub ./books/
+
+# Directory recursively
+pdf2epub ./books/ --recursive
+
+# Explicit glob (quoted, expanded by Python)
+pdf2epub "*.pdf"
+```
+
+### Output behavior
+
+- By default, each input PDF writes an EPUB next to the source file:
+  - `report.pdf -> report.epub`
+  - `./books/a.pdf -> ./books/a.epub`
+- With `-o/--output`:
+  - Single input: `-o` is the exact output file path
+  - Multiple inputs: `-o` is treated as an output directory
 
 ### Options
 
+- `-o, --output`
 - `--title` (default: PDF filename stem)
 - `--author` (default: `Unknown`)
 - `--lang` (default: `en`)
 - `--ocr` (`off|auto|always`, default: `auto`)
 - `--split-pages N` (default: `10`)
+- `--force` (overwrite existing output files)
+- `--recursive` (recursive directory scanning)
 - `--verbose`
 
-## Examples
+### Shell glob expansion (macOS zsh/bash)
 
-Basic conversion:
-
-```bash
-pdf2epub book.pdf -o book.epub
-```
-
-Force OCR on every page:
+On macOS, zsh/bash typically expands globs before your command runs:
 
 ```bash
-pdf2epub scan.pdf -o scan.epub --ocr always
+pdf2epub *.pdf
 ```
 
-Smaller chapter chunks:
+This becomes a list of matching files passed to the CLI. If you quote the pattern:
 
 ```bash
-pdf2epub long.pdf -o long.epub --split-pages 5 --title "My Book" --author "A. Author"
+pdf2epub "*.pdf"
 ```
+
+The shell passes the literal string, and `pdf2epub` expands it using Python's `glob.glob()`.
 
 ## How it works
 
-1. Extract per-page text with `page.get_text("text")`
-2. In `--ocr auto`, OCR pages with very little extracted text (< 50 chars)
-3. Clean text (hyphenation/newline normalization)
-4. Chunk pages into chapters of `N` pages
-5. Write a reflowable EPUB with navigation (NCX + nav)
+1. Resolve input arguments to a deduplicated list of PDF files
+2. Extract per-page text with `page.get_text("text")`
+3. In `--ocr auto`, OCR pages with very little extracted text (< 50 chars)
+4. Clean text (hyphenation/newline normalization)
+5. Chunk pages into chapters of `N` pages
+6. Write a reflowable EPUB with navigation (NCX + nav)
 
 ## Known limitations
 
