@@ -9,6 +9,8 @@ A small, production-minded CLI tool to convert PDF files into reflowable EPUB fi
 - Optional OCR fallback for scanned/image pages via `pytesseract`
 - Clean, simple chapter chunking by page count
 - Batch conversion from files, directories, and glob patterns
+- Parallel conversion with process workers (`--jobs`)
+- Rich progress bar for batch runs
 
 ## Requirements
 
@@ -39,78 +41,109 @@ pip install -e '.[ocr]'
 pdf2epub FILES_OR_PATTERNS...
 ```
 
-### CLI behavior
-
-Input arguments can be:
-
-- PDF files
-- Directories (find `*.pdf` in that directory)
-- Glob patterns like `*.pdf`
-
-Examples:
+### Core examples
 
 ```bash
-# Single file
+# Single
 pdf2epub input.pdf
 
-# Multiple files
-pdf2epub file1.pdf file2.pdf
+# Multiple
+pdf2epub a.pdf b.pdf
+
+# Glob expanded by shell
+pdf2epub *.pdf
+
+# Quoted glob expanded in-app
+pdf2epub "*.pdf"
 
 # Directory
 pdf2epub ./books/
 
-# Directory recursively
+# Recursive directory scan
 pdf2epub ./books/ --recursive
 
-# Explicit glob (quoted, expanded by Python)
-pdf2epub "*.pdf"
+# Quoted glob + parallel jobs
+pdf2epub "*.pdf" --jobs 6
 ```
+
+### Input discovery rules
+
+Each positional input can be:
+
+- A PDF file (included)
+- A directory:
+  - direct `*.pdf` children
+  - recursive `**/*.pdf` when `--recursive` is used
+- A glob pattern (expanded by Python when passed literally, e.g. `"*.pdf"`)
+
+Discovered PDFs are deduplicated and processed in deterministic sorted order.
 
 ### Output behavior
 
-- By default, each input PDF writes an EPUB next to the source file:
+- Default: output is next to each source PDF using the same stem:
   - `report.pdf -> report.epub`
   - `./books/a.pdf -> ./books/a.epub`
-- With `-o/--output`:
-  - Single input: `-o` is the exact output file path
-  - Multiple inputs: `-o` is treated as an output directory
+- With `-o/--out`:
+  - Single discovered PDF: treated as an output file path (coerced to `.epub` if needed)
+  - Multiple discovered PDFs: treated as an output directory (`out_dir/<stem>.epub`)
 
-### Options
+### Existing output files
 
-- `-o, --output`
-- `--title` (default: PDF filename stem)
-- `--author` (default: `Unknown`)
-- `--lang` (default: `en`)
-- `--ocr` (`off|auto|always`, default: `auto`)
-- `--split-pages N` (default: `10`)
-- `--force` (overwrite existing output files)
-- `--recursive` (recursive directory scanning)
-- `--verbose`
+- Without `--force`: existing output is skipped and reported as skipped
+- With `--force`: output is overwritten
 
-### Shell glob expansion (macOS zsh/bash)
+### Parallel and progress options
 
-On macOS, zsh/bash typically expands globs before your command runs:
+- `-j, --jobs N`
+  - Default: `cpu_count() - 1`
+  - Min: `1`
+  - Max: `cpu_count()`
+- `--sequential`
+  - Forces single-process conversion (helpful for debugging)
+
+Batch runs use a Rich progress bar showing total and completed counts plus a current file label.
+
+### Exit codes and summary
+
+End-of-run summary includes:
+
+- Total PDFs discovered
+- Converted
+- Skipped
+- Failed
+
+Exit code:
+
+- `0` when no failures
+- `1` when one or more conversions fail
+- `2` when no PDFs are discovered
+
+### Shell glob behavior on macOS (zsh/bash)
+
+On macOS shells, unquoted globs are usually expanded before the CLI starts:
 
 ```bash
 pdf2epub *.pdf
 ```
 
-This becomes a list of matching files passed to the CLI. If you quote the pattern:
+Quoted globs are passed literally, so the CLI performs expansion:
 
 ```bash
 pdf2epub "*.pdf"
 ```
 
-The shell passes the literal string, and `pdf2epub` expands it using Python's `glob.glob()`.
+Both forms are supported.
 
 ## How it works
 
-1. Resolve input arguments to a deduplicated list of PDF files
-2. Extract per-page text with `page.get_text("text")`
-3. In `--ocr auto`, OCR pages with very little extracted text (< 50 chars)
-4. Clean text (hyphenation/newline normalization)
-5. Chunk pages into chapters of `N` pages
-6. Write a reflowable EPUB with navigation (NCX + nav)
+1. Resolve inputs into a deduplicated list of PDFs
+2. Build one conversion task per PDF
+3. Run tasks sequentially or in parallel workers
+4. Extract per-page text with `page.get_text("text")`
+5. In `--ocr auto`, OCR pages with very little extracted text (< 50 chars)
+6. Clean text (hyphenation/newline normalization)
+7. Chunk pages into chapters of `N` pages
+8. Write reflowable EPUB with navigation (NCX + nav)
 
 ## Known limitations
 
