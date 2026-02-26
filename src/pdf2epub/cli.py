@@ -12,7 +12,7 @@ from typing import Literal
 
 import typer
 
-from .convert import convert_pdf_to_epub
+from .convert import AuthorMode, convert_pdf_to_epub
 from .pdf_extract import OCRMode
 
 try:
@@ -31,10 +31,12 @@ class ConvertTask:
     input_pdf: Path
     output_epub: Path
     title: str
-    author: str
+    author: str | None
     lang: str
     ocr_mode: OCRMode
     split_pages: int
+    author_mode: AuthorMode
+    no_preface: bool
     force: bool
 
 
@@ -125,6 +127,8 @@ def _convert_one(task: ConvertTask) -> ConvertResult:
             author=task.author,
             lang=task.lang,
             ocr_mode=task.ocr_mode,
+            author_mode=task.author_mode,
+            no_preface=task.no_preface,
             split_pages=task.split_pages,
         )
     except Exception as exc:  # noqa: BLE001 - keep batch conversion alive per-file.
@@ -210,9 +214,11 @@ def main(
     files_or_patterns: list[str] = typer.Argument(..., metavar="FILES_OR_PATTERNS...", help="PDF files, directories, or glob patterns."),
     output: Path | None = typer.Option(None, "-o", "--out", "--output", help="Output EPUB file (single input) or output directory (multiple inputs)."),
     title: str | None = typer.Option(None, "--title", help="Book title (defaults to each input stem)."),
-    author: str = typer.Option("Unknown", "--author", help="Book author."),
+    author: str | None = typer.Option(None, "--author", help="Book author (overrides inference)."),
     lang: str = typer.Option("en", "--lang", help="Book language code."),
     ocr: OCRMode = typer.Option("auto", "--ocr", help="OCR mode: off, auto, always."),
+    author_mode: AuthorMode = typer.Option("auto", "--author-mode", help="Author inference mode: metadata, heuristic, auto."),
+    no_preface: bool = typer.Option(False, "--no-preface", help="Do not include a preface section in the EPUB."),
     split_pages: int = typer.Option(10, "--split-pages", min=1, help="Pages per chapter."),
     force: bool = typer.Option(False, "--force", help="Overwrite existing EPUB output file(s)."),
     recursive: bool = typer.Option(False, "--recursive", help="Recursively scan directories for PDFs."),
@@ -242,6 +248,8 @@ def main(
             author=author,
             lang=lang,
             ocr_mode=ocr,
+            author_mode=author_mode,
+            no_preface=no_preface,
             split_pages=split_pages,
             force=force,
         )

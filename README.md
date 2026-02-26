@@ -11,6 +11,8 @@ A small, production-minded CLI tool to convert PDF files into reflowable EPUB fi
 - Batch conversion from files, directories, and glob patterns
 - Parallel conversion with process workers (`--jobs`)
 - Rich progress bar for batch runs
+- Author inference from PDF metadata/front matter
+- EPUB preface page with detected authors/contact details (best-effort)
 
 ## Requirements
 
@@ -86,6 +88,28 @@ Discovered PDFs are deduplicated and processed in deterministic sorted order.
 - With `-o/--out`:
   - Single discovered PDF: treated as an output file path (coerced to `.epub` if needed)
   - Multiple discovered PDFs: treated as an output directory (`out_dir/<stem>.epub`)
+
+
+### Author inference and preface
+
+By default (`--author-mode auto`), each PDF is processed independently with this order:
+
+1. PDF metadata author (`doc.metadata["author"]`)
+2. Heuristic parsing from the first 1-2 pages (`By ...`, name-like lines near the top)
+3. Fallback to `Unknown`
+
+`--author` overrides inference completely for EPUB metadata.
+
+Contact details in the preface are best-effort and include only values detected from PDF text (emails/URLs and nearby affiliation lines).
+
+Options:
+
+- `--author-mode metadata` -> use metadata only
+- `--author-mode heuristic` -> use heuristic only
+- `--author-mode auto` -> metadata then heuristic fallback
+- `--no-preface` -> do not include the preface page
+
+When preface is enabled, TOC/spine order starts with **Preface**, then Chapter 1, Chapter 2, etc.
 
 ### Existing output files
 
