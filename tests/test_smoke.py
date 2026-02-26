@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import fitz  # type: ignore[import-not-found]
+import pytest
+
+fitz = pytest.importorskip("fitz")
 
 from pdf2epub.convert import convert_pdf_to_epub
 
