@@ -13,7 +13,7 @@ from typing import Literal
 import typer
 
 from .convert import AuthorMode, CoverMode, convert_pdf_to_epub
-from .pdf_extract import OCRMode
+from .pdf_extract import LayoutMode, OCRMode
 
 try:
     from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
@@ -40,6 +40,7 @@ class ConvertTask:
     no_brand: bool
     logo_path: Path | None
     cover_mode: CoverMode
+    layout: LayoutMode
     force: bool
 
 
@@ -136,6 +137,7 @@ def _convert_one(task: ConvertTask) -> ConvertResult:
             no_brand=task.no_brand,
             logo_path=task.logo_path,
             cover_mode=task.cover_mode,
+            layout=task.layout,
         )
     except Exception as exc:  # noqa: BLE001 - keep batch conversion alive per-file.
         return ConvertResult(status="fail", input_pdf=task.input_pdf, output_epub=task.output_epub, error=str(exc))
@@ -229,6 +231,7 @@ def main(
     no_brand: bool = typer.Option(False, "--no-brand", help="Generate cover without embedding the logo badge."),
     logo: Path | None = typer.Option(None, "--logo", exists=True, file_okay=True, dir_okay=False, help="Path to logo image used for cover branding."),
     cover_mode: CoverMode = typer.Option("styled", "--cover-mode", help="Cover generation mode: styled or none."),
+    layout: LayoutMode = typer.Option("simple", "--layout", help="Layout mode: simple (default block order) or columns (left-to-right ordering)."),
     force: bool = typer.Option(False, "--force", help="Overwrite existing EPUB output file(s)."),
     recursive: bool = typer.Option(False, "--recursive", help="Recursively scan directories for PDFs."),
     jobs: int = typer.Option(_default_jobs(), "-j", "--jobs", min=1, help="Parallel worker processes."),
@@ -262,6 +265,7 @@ def main(
             no_brand=no_brand,
             logo_path=logo,
             cover_mode=cover_mode,
+            layout=layout,
             split_pages=split_pages,
             force=force,
         )

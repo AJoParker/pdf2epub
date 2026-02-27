@@ -9,21 +9,24 @@ from typing import Literal
 from .author_extract import infer_author_info
 from .epub_build import build_epub
 from .cover_gen import generate_cover_png
-from .pdf_extract import OCRMode, extract_pages_text
+from .pdf_extract import ContentBlock, LayoutMode, OCRMode, extract_pages_content
 
 AuthorMode = Literal["metadata", "heuristic", "auto"]
 CoverMode = Literal["styled", "none"]
 
 
-def _chunk_pages(pages: list[str], split_pages: int) -> list[str]:
+def _chunk_pages(pages: list[list[ContentBlock]], split_pages: int) -> list[list[ContentBlock]]:
     if split_pages <= 0:
         raise ValueError("split_pages must be > 0")
 
-    chunks: list[str] = []
+    chunks: list[list[ContentBlock]] = []
     for i in range(0, len(pages), split_pages):
-        chunk = "\n\n".join(page for page in pages[i : i + split_pages] if page.strip())
-        chunks.append(chunk.strip())
-    return [chunk for chunk in chunks if chunk]
+        chunk: list[ContentBlock] = []
+        for page in pages[i : i + split_pages]:
+            chunk.extend(page)
+        if chunk:
+            chunks.append(chunk)
+    return chunks
 
 
 def convert_pdf_to_epub(
@@ -40,6 +43,7 @@ def convert_pdf_to_epub(
     no_brand: bool = False,
     logo_path: Path | None = None,
     cover_mode: CoverMode = "styled",
+    layout: LayoutMode = "simple",
     logger: logging.Logger | None = None,
 ) -> None:
     """Convert a PDF file into a reflowable EPUB."""
@@ -56,7 +60,7 @@ def convert_pdf_to_epub(
     preface_contacts = inferred.contacts
 
     logger.info("Extracting text from PDF: %s", input_pdf)
-    pages = extract_pages_text(str(input_pdf), ocr_mode=ocr_mode, logger=logger)
+    pages = extract_pages_content(str(input_pdf), ocr_mode=ocr_mode, layout=layout, logger=logger)
     if not pages:
         raise RuntimeError("No pages found in input PDF")
 

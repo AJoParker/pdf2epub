@@ -7,15 +7,66 @@ from pathlib import Path
 
 from ebooklib import epub
 
+from .pdf_extract import ContentBlock, InlineSpan
 
-def _paragraphs_to_xhtml(paragraphs: list[str]) -> str:
-    if not paragraphs:
+
+def _render_spans(spans: list[InlineSpan]) -> str:
+    chunks: list[str] = []
+    for span in spans:
+        text = escape(span.text)
+        if span.bold and span.italic:
+            text = f"<strong><em>{text}</em></strong>"
+        elif span.bold:
+            text = f"<strong>{text}</strong>"
+        elif span.italic:
+            text = f"<em>{text}</em>"
+        chunks.append(text)
+    return "".join(chunks)
+
+
+def _render_block_content(lines: list[list[InlineSpan]], preserve_breaks: bool = False) -> str:
+    rendered_lines = [_render_spans(line) for line in lines]
+    return "\n".join(rendered_lines) if preserve_breaks else "<br/>".join(rendered_lines)
+
+
+def _blocks_to_xhtml(blocks: list[ContentBlock]) -> str:
+    if not blocks:
         return "<p></p>"
-    return "\n".join(f"<p>{escape(p)}</p>" for p in paragraphs)
+
+    html_parts: list[str] = []
+    pending_list_type: str | None = None
+
+    def flush_list() -> None:
+        nonlocal pending_list_type
+        if pending_list_type is not None:
+            html_parts.append(f"</{pending_list_type}>")
+            pending_list_type = None
+
+    for block in blocks:
+        if block.kind == "list":
+            list_type = block.list_type or "ul"
+            if pending_list_type != list_type:
+                flush_list()
+                html_parts.append(f"<{list_type}>")
+                pending_list_type = list_type
+            html_parts.append(f"<li>{_render_block_content(block.spans_by_line)}</li>")
+            continue
+
+        flush_list()
+        if block.kind == "heading":
+            heading_level = block.heading_level or 2
+            html_parts.append(f"<h{heading_level}>{_render_block_content(block.spans_by_line)}</h{heading_level}>")
+        elif block.kind == "code":
+            html_parts.append(f"<pre><code>{_render_block_content(block.spans_by_line, preserve_breaks=True)}</code></pre>")
+        else:
+            html_parts.append(f"<p>{_render_block_content(block.spans_by_line)}</p>")
+
+    flush_list()
+    return "\n".join(html_parts)
 
 
 def build_epub(
-    chapter_texts: list[str],
+    chapter_blocks: list[list[ContentBlock]],
     output_path: Path,
     *,
     title: str,
@@ -63,13 +114,12 @@ def build_epub(
         book.add_item(preface)
         items.append(preface)
 
-    for idx, chapter_text in enumerate(chapter_texts, start=1):
+    for idx, chapter_content in enumerate(chapter_blocks, start=1):
         chapter_title = f"Chapter {idx}"
-        paragraphs = [p.strip() for p in chapter_text.split("\n\n") if p.strip()]
         html = (
             "<html><head><meta charset='utf-8' /></head><body>"
             f"<h1>{escape(chapter_title)}</h1>"
-            f"{_paragraphs_to_xhtml(paragraphs)}"
+            f"{_blocks_to_xhtml(chapter_content)}"
             "</body></html>"
         )
         chapter = epub.EpubHtml(
