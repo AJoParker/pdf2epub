@@ -6,9 +6,10 @@ import logging
 from pathlib import Path
 from typing import Literal
 
+from .academic_epub import build_academic_epub
 from .author_extract import infer_author_info
-from .epub_build import build_epub
 from .cover_gen import generate_cover_png
+from .epub_build import build_epub
 from .pdf_extract import ContentBlock, LayoutMode, OCRMode, extract_pages_content
 
 AuthorMode = Literal["metadata", "heuristic", "auto"]
@@ -27,6 +28,36 @@ def _chunk_pages(pages: list[list[ContentBlock]], split_pages: int) -> list[list
         if chunk:
             chunks.append(chunk)
     return chunks
+
+
+def _resolve_author_and_cover(
+    input_pdf: Path,
+    *,
+    title: str,
+    author: str | None,
+    ocr_mode: OCRMode,
+    author_mode: AuthorMode,
+    no_brand: bool,
+    logo_path: Path | None,
+    cover_mode: CoverMode,
+    logger: logging.Logger,
+) -> tuple[str, list[str], list[str], bytes | None]:
+    inferred = infer_author_info(input_pdf, mode=author_mode, ocr_mode=ocr_mode, logger=logger)
+    final_author = author.strip() if author and author.strip() else (inferred.primary_author or "Unknown")
+
+    preface_authors = inferred.authors if inferred.authors else ([final_author] if author else [])
+    preface_contacts = inferred.contacts
+
+    cover_png_bytes = None
+    if cover_mode != "none":
+        cover_png_bytes = generate_cover_png(
+            title=title,
+            author=final_author,
+            include_branding=not no_brand,
+            logo_path=logo_path,
+        )
+
+    return final_author, preface_authors, preface_contacts, cover_png_bytes
 
 
 def convert_pdf_to_epub(
@@ -53,11 +84,17 @@ def convert_pdf_to_epub(
     if not input_pdf.exists():
         raise FileNotFoundError(f"Input PDF not found: {input_pdf}")
 
-    inferred = infer_author_info(input_pdf, mode=author_mode, ocr_mode=ocr_mode, logger=logger)
-    final_author = author.strip() if author and author.strip() else (inferred.primary_author or "Unknown")
-
-    preface_authors = inferred.authors if inferred.authors else ([final_author] if author else [])
-    preface_contacts = inferred.contacts
+    final_author, preface_authors, preface_contacts, cover_png_bytes = _resolve_author_and_cover(
+        input_pdf,
+        title=title,
+        author=author,
+        ocr_mode=ocr_mode,
+        author_mode=author_mode,
+        no_brand=no_brand,
+        logo_path=logo_path,
+        cover_mode=cover_mode,
+        logger=logger,
+    )
 
     logger.info("Extracting text from PDF: %s", input_pdf)
     pages = extract_pages_content(str(input_pdf), ocr_mode=ocr_mode, layout=layout, logger=logger)
@@ -69,15 +106,6 @@ def convert_pdf_to_epub(
         raise RuntimeError("No usable text extracted from PDF")
 
     logger.info("Building EPUB with %s chapter(s)", len(chapters))
-    cover_png_bytes = None
-    if cover_mode != "none":
-        cover_png_bytes = generate_cover_png(
-            title=title,
-            author=final_author,
-            include_branding=not no_brand,
-            logo_path=logo_path,
-        )
-
     build_epub(
         chapters,
         output_epub,
@@ -89,4 +117,51 @@ def convert_pdf_to_epub(
         preface_contacts=preface_contacts,
         include_preface=not no_preface,
         cover_png_bytes=cover_png_bytes,
+    )
+
+
+def convert_pdf_to_academic_epub(
+    input_pdf: Path,
+    output_epub: Path,
+    *,
+    title: str,
+    author: str | None = None,
+    lang: str = "en",
+    ocr_mode: OCRMode = "auto",
+    author_mode: AuthorMode = "auto",
+    no_brand: bool = False,
+    logo_path: Path | None = None,
+    cover_mode: CoverMode = "styled",
+    render_dpi: int = 200,
+    logger: logging.Logger | None = None,
+) -> None:
+    """Convert a PDF file into a fixed-layout (academic) EPUB."""
+    if logger is None:
+        logger = logging.getLogger(__name__)
+
+    if not input_pdf.exists():
+        raise FileNotFoundError(f"Input PDF not found: {input_pdf}")
+
+    final_author, _, _, cover_png_bytes = _resolve_author_and_cover(
+        input_pdf,
+        title=title,
+        author=author,
+        ocr_mode=ocr_mode,
+        author_mode=author_mode,
+        no_brand=no_brand,
+        logo_path=logo_path,
+        cover_mode=cover_mode,
+        logger=logger,
+    )
+
+    logger.info("Building fixed-layout academic EPUB: %s", input_pdf)
+    build_academic_epub(
+        pdf_path=input_pdf,
+        epub_path=output_epub,
+        title=title,
+        author=final_author,
+        lang=lang,
+        identifier=f"pdf2epub:{input_pdf.resolve()}",
+        cover_bytes=cover_png_bytes,
+        render_dpi=render_dpi,
     )
