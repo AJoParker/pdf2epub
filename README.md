@@ -13,6 +13,7 @@ A small, production-minded CLI tool to convert PDF files into reflowable EPUB fi
 - Rich progress bar for batch runs
 - Author inference from PDF metadata/front matter
 - EPUB preface page with detected authors/contact details (best-effort)
+- Academic fixed-layout EPUB mode (`--academic`) for two-column papers and layout fidelity
 
 ## Requirements
 
@@ -66,6 +67,12 @@ pdf2epub ./books/ --recursive
 
 # Quoted glob + parallel jobs
 pdf2epub "*.pdf" --jobs 6
+
+# Academic fixed-layout conversion for a paper
+pdf2epub paper.pdf --academic
+
+# Batch academic conversion
+pdf2epub "*.pdf" --academic --jobs 6
 ```
 
 ### Input discovery rules
@@ -112,6 +119,7 @@ Options:
 - `--no-brand` -> keep styled cover but hide the logo badge
 - `--logo PATH` -> custom logo for bottom-right cover badge
 - `--layout simple|columns` -> keep native block order (`simple`, default) or try left-to-right block ordering (`columns`)
+- `--academic` -> ignore reflow reconstruction and build fixed-layout EPUB3 with one rendered image per PDF page
 
 When preface is enabled, TOC/spine order starts with **Preface**, then Chapter 1, Chapter 2, etc.
 
@@ -174,6 +182,12 @@ Both forms are supported.
 8. Chunk pages into chapters of `N` pages
 9. Write reflowable EPUB with navigation (NCX + nav)
 
+When `--academic` is enabled, the pipeline switches to fixed-layout mode:
+1. Render each PDF page to PNG via PyMuPDF
+2. Create one XHTML wrapper per page with viewport metadata
+3. Add fixed-layout rendition metadata in OPF
+4. Build a page-by-page spine/TOC (Cover, Page 1, Page 2, ...)
+
 ## Known limitations
 
 - Pixel-perfect PDF layout parity is not guaranteed in reflowable EPUB output.
@@ -181,7 +195,8 @@ Both forms are supported.
 - Multi-column layouts can be read out of order (use `--layout columns` as a best-effort alternative).
 - Mathematical notation is not faithfully preserved.
 - OCR quality depends on scan quality and Tesseract language data; OCR output is plain text and does not preserve inline formatting.
-- For highest layout fidelity, a fixed-layout EPUB mode is future work.
+- `--academic` preserves page layout but produces fixed-layout EPUB (not reflowable).
+- Academic mode is image-based, so text selection/accessibility are limited until a future text-layer feature is added.
 
 ## Development
 

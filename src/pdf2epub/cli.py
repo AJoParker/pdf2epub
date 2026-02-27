@@ -12,7 +12,7 @@ from typing import Literal
 
 import typer
 
-from .convert import AuthorMode, CoverMode, convert_pdf_to_epub
+from .convert import AuthorMode, CoverMode, convert_pdf_to_academic_epub, convert_pdf_to_epub
 from .pdf_extract import LayoutMode, OCRMode
 
 try:
@@ -42,6 +42,7 @@ class ConvertTask:
     cover_mode: CoverMode
     layout: LayoutMode
     force: bool
+    academic: bool
 
 
 @dataclass(frozen=True)
@@ -124,21 +125,35 @@ def _convert_one(task: ConvertTask) -> ConvertResult:
     task.output_epub.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        convert_pdf_to_epub(
-            input_pdf=task.input_pdf,
-            output_epub=task.output_epub,
-            title=task.title,
-            author=task.author,
-            lang=task.lang,
-            ocr_mode=task.ocr_mode,
-            author_mode=task.author_mode,
-            no_preface=task.no_preface,
-            split_pages=task.split_pages,
-            no_brand=task.no_brand,
-            logo_path=task.logo_path,
-            cover_mode=task.cover_mode,
-            layout=task.layout,
-        )
+        if task.academic:
+            convert_pdf_to_academic_epub(
+                input_pdf=task.input_pdf,
+                output_epub=task.output_epub,
+                title=task.title,
+                author=task.author,
+                lang=task.lang,
+                ocr_mode=task.ocr_mode,
+                author_mode=task.author_mode,
+                no_brand=task.no_brand,
+                logo_path=task.logo_path,
+                cover_mode=task.cover_mode,
+            )
+        else:
+            convert_pdf_to_epub(
+                input_pdf=task.input_pdf,
+                output_epub=task.output_epub,
+                title=task.title,
+                author=task.author,
+                lang=task.lang,
+                ocr_mode=task.ocr_mode,
+                author_mode=task.author_mode,
+                no_preface=task.no_preface,
+                split_pages=task.split_pages,
+                no_brand=task.no_brand,
+                logo_path=task.logo_path,
+                cover_mode=task.cover_mode,
+                layout=task.layout,
+            )
     except Exception as exc:  # noqa: BLE001 - keep batch conversion alive per-file.
         return ConvertResult(status="fail", input_pdf=task.input_pdf, output_epub=task.output_epub, error=str(exc))
 
@@ -232,6 +247,7 @@ def main(
     logo: Path | None = typer.Option(None, "--logo", exists=True, file_okay=True, dir_okay=False, help="Path to logo image used for cover branding."),
     cover_mode: CoverMode = typer.Option("styled", "--cover-mode", help="Cover generation mode: styled or none."),
     layout: LayoutMode = typer.Option("simple", "--layout", help="Layout mode: simple (default block order) or columns (left-to-right ordering)."),
+    academic: bool = typer.Option(False, "--academic", help="Generate fixed-layout EPUB by rendering each PDF page as an image."),
     force: bool = typer.Option(False, "--force", help="Overwrite existing EPUB output file(s)."),
     recursive: bool = typer.Option(False, "--recursive", help="Recursively scan directories for PDFs."),
     jobs: int = typer.Option(_default_jobs(), "-j", "--jobs", min=1, help="Parallel worker processes."),
@@ -268,6 +284,7 @@ def main(
             layout=layout,
             split_pages=split_pages,
             force=force,
+            academic=academic,
         )
         for input_pdf in input_pdfs
     ]
