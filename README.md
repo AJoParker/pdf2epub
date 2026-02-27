@@ -4,7 +4,7 @@ A small, production-minded CLI tool to convert PDF files into reflowable EPUB fi
 
 ## Features
 
-- Text-based PDF extraction using [PyMuPDF](https://pymupdf.readthedocs.io/)
+- Structured text extraction using [PyMuPDF](https://pymupdf.readthedocs.io/) (`dict` blocks/lines/spans)
 - EPUB generation with [EbookLib](https://github.com/aerkalov/ebooklib)
 - Optional OCR fallback for scanned/image pages via `pytesseract`
 - Clean, simple chapter chunking by page count
@@ -111,6 +111,7 @@ Options:
 - `--cover-mode styled|none` -> generate branded navy cover or disable cover generation
 - `--no-brand` -> keep styled cover but hide the logo badge
 - `--logo PATH` -> custom logo for bottom-right cover badge
+- `--layout simple|columns` -> keep native block order (`simple`, default) or try left-to-right block ordering (`columns`)
 
 When preface is enabled, TOC/spine order starts with **Preface**, then Chapter 1, Chapter 2, etc.
 
@@ -166,18 +167,21 @@ Both forms are supported.
 1. Resolve inputs into a deduplicated list of PDFs
 2. Build one conversion task per PDF
 3. Run tasks sequentially or in parallel workers
-4. Extract per-page text with `page.get_text("text")`
+4. Extract per-page structured text with `page.get_text("dict")`
 5. In `--ocr auto`, OCR pages with very little extracted text (< 50 chars)
 6. Clean text (hyphenation/newline normalization)
-7. Chunk pages into chapters of `N` pages
-8. Write reflowable EPUB with navigation (NCX + nav)
+7. Reconstruct paragraphs/headings/lists/code blocks with geometry + font heuristics
+8. Chunk pages into chapters of `N` pages
+9. Write reflowable EPUB with navigation (NCX + nav)
 
 ## Known limitations
 
-- Complex tables may lose structure
-- Multi-column layouts can be read out of order
-- Mathematical notation is not faithfully preserved
-- OCR quality depends on scan quality and Tesseract language data
+- Pixel-perfect PDF layout parity is not guaranteed in reflowable EPUB output.
+- Complex tables may lose structure.
+- Multi-column layouts can be read out of order (use `--layout columns` as a best-effort alternative).
+- Mathematical notation is not faithfully preserved.
+- OCR quality depends on scan quality and Tesseract language data; OCR output is plain text and does not preserve inline formatting.
+- For highest layout fidelity, a fixed-layout EPUB mode is future work.
 
 ## Development
 
