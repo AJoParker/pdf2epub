@@ -181,6 +181,8 @@ Both forms are supported.
 
 ## Development
 
+Contributor guide: see [`AGENTS.md`](AGENTS.md) for repository conventions and PR expectations.
+
 Run tests:
 
 ```bash
